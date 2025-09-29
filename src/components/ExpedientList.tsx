@@ -7,7 +7,7 @@ import {
   Search, 
   Filter,
   Eye,
-  Edit,
+  RefreshCw,
   Calendar,
   User,
   FileText,
@@ -15,14 +15,15 @@ import {
   SortAsc,
   SortDesc
 } from "lucide-react";
+import { StatusChangeConfirmDialog } from "@/components/StatusChangeConfirmDialog";
 import { ExpedientSummary } from "@/types/expedient";
 import { useUser } from "@/contexts/UserContext";
 
 interface ExpedientListProps {
   expedients: ExpedientSummary[];
   onViewExpedient?: (id: string) => void;
-  onEditExpedient?: (id: string) => void;
   onCreateExpedient?: () => void;
+  onStatusChange?: (id: string, newStatus: 'en_tramite' | 'archivado') => void;
   initialStatusFilter?: string;
 }
 
@@ -32,21 +33,36 @@ type SortDirection = 'asc' | 'desc';
 export function ExpedientList({ 
   expedients, 
   onViewExpedient, 
-  onEditExpedient, 
   onCreateExpedient,
+  onStatusChange,
   initialStatusFilter 
 }: ExpedientListProps) {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<'all' | 'draft' | 'derivado' | 'recibido' | 'en_tramite' | 'pausado'>(
-    initialStatusFilter && ['draft', 'derivado', 'recibido', 'en_tramite', 'pausado'].includes(initialStatusFilter) 
-      ? initialStatusFilter as 'draft' | 'derivado' | 'recibido' | 'en_tramite' | 'pausado'
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'draft' | 'en_tramite' | 'archivado'>(
+    initialStatusFilter && ['draft', 'en_tramite', 'archivado'].includes(initialStatusFilter) 
+      ? initialStatusFilter as 'draft' | 'en_tramite' | 'archivado'
       : 'all'
   );
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const canEdit = true; // Ambos perfiles pueden editar
+
+  const handleStatusChange = (expedientId: string, currentStatus: 'en_tramite' | 'archivado') => {
+    const newStatus = currentStatus === 'en_tramite' ? 'archivado' : 'en_tramite';
+    onStatusChange?.(expedientId, newStatus);
+  };
+
+  const getStatusChangeLabel = (status: 'en_tramite' | 'archivado') => {
+    return status === 'en_tramite' ? 'Archivar' : 'Reactivar';
+  };
+
+  const getStatusChangeMessage = (status: 'en_tramite' | 'archivado') => {
+    return status === 'en_tramite' 
+      ? '¿Está seguro de que desea archivar este expediente?' 
+      : '¿Está seguro de que desea reactivar este expediente?';
+  };
 
   // Filter expedients based on search term and status
   const filteredExpedients = expedients.filter(expedient => {
@@ -93,21 +109,17 @@ export function ExpedientList({
     }
   };
 
-  const getStatusBadge = (status: 'draft' | 'derivado' | 'recibido' | 'en_tramite' | 'pausado') => {
+  const getStatusBadge = (status: 'draft' | 'en_tramite' | 'archivado') => {
     const colors = {
       draft: 'bg-[hsl(var(--status-draft))] text-[hsl(var(--status-draft-foreground))] border-[hsl(var(--status-draft))]',
-      derivado: 'bg-[hsl(var(--status-derivado))] text-[hsl(var(--status-derivado-foreground))] border-[hsl(var(--status-derivado))]',
-      recibido: 'bg-[hsl(var(--status-recibido))] text-[hsl(var(--status-recibido-foreground))] border-[hsl(var(--status-recibido))]',
       en_tramite: 'bg-[hsl(var(--status-en-tramite))] text-[hsl(var(--status-en-tramite-foreground))] border-[hsl(var(--status-en-tramite))]',
-      pausado: 'bg-[hsl(var(--status-pausado))] text-[hsl(var(--status-pausado-foreground))] border-[hsl(var(--status-pausado))]'
+      archivado: 'bg-[hsl(var(--status-archivado))] text-[hsl(var(--status-archivado-foreground))] border-[hsl(var(--status-archivado))]'
     };
     
     const labels = {
       draft: 'Borrador',
-      derivado: 'Derivado',
-      recibido: 'Recibido',
       en_tramite: 'En Trámite',
-      pausado: 'Pausado'
+      archivado: 'Archivado'
     };
 
     return (
@@ -169,7 +181,7 @@ export function ExpedientList({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground whitespace-nowrap">Estado:</span>
                 <div className="flex flex-wrap gap-1">
-                  {['all', 'draft', 'derivado', 'recibido', 'en_tramite', 'pausado'].map((status) => (
+                  {['all', 'draft', 'en_tramite', 'archivado'].map((status) => (
                     <Button
                       key={status}
                       variant={selectedStatus === status ? 'default' : 'outline'}
@@ -179,10 +191,8 @@ export function ExpedientList({
                     >
                       {status === 'all' ? 'Todos' : 
                        status === 'draft' ? 'Borradores' :
-                       status === 'derivado' ? 'Derivados' :
-                       status === 'recibido' ? 'Recibidos' :
                        status === 'en_tramite' ? 'En Trámite' :
-                       status === 'pausado' ? 'Pausados' : status}
+                       status === 'archivado' ? 'Archivados' : status}
                     </Button>
                   ))}
                 </div>
@@ -232,15 +242,23 @@ export function ExpedientList({
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full">
+               <table className="w-full table-fixed">
+                 <colgroup>
+                   <col className="w-32" />
+                   <col className="w-auto" />
+                   <col className="w-32" />
+                   <col className="w-40" />
+                   <col className="w-32" />
+                   <col className="w-24" />
+                 </colgroup>
                 <thead className="border-b">
                   <tr className="bg-muted/30">
-                    <th className="text-left p-4 font-medium">Número</th>
+                    <th className="text-left p-4 font-medium w-32">Número</th>
                     <th className="text-left p-4 font-medium">Expediente</th>
-                    <th className="text-left p-4 font-medium">Estado</th>
-                    <th className="text-left p-4 font-medium">Creado por</th>
-                    <th className="text-left p-4 font-medium">Fecha</th>
-                    <th className="text-right p-4 font-medium">Acciones</th>
+                    <th className="text-left p-4 font-medium w-32">Estado</th>
+                    <th className="text-left p-4 font-medium w-40">Creado por</th>
+                    <th className="text-left p-4 font-medium w-32">Fecha</th>
+                    <th className="text-right p-4 font-medium w-24">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -254,21 +272,9 @@ export function ExpedientList({
                           {expedient.number}
                         </span>
                       </td>
-                      <td className="p-4 max-w-md">
-                        <div className="space-y-1">
-                          <div className="font-medium text-foreground line-clamp-1">
-                            {expedient.title}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            <span className="font-medium">Ref:</span> {expedient.referencia}
-                          </div>
-                          <div className="text-xs text-muted-foreground/80 line-clamp-2">
-                            {expedient.content.replace(/<[^>]*>/g, '').substring(0, 120)}
-                            {expedient.content.length > 120 && '...'}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            <span className="capitalize">{expedient.tipoProceso}</span> • {expedient.department}
-                          </div>
+                      <td className="p-4">
+                        <div className="font-medium text-foreground line-clamp-1">
+                          {expedient.title}
                         </div>
                       </td>
                       <td className="p-4">
@@ -299,14 +305,19 @@ export function ExpedientList({
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          {canEdit && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onEditExpedient?.(expedient.id)}
+                          {canEdit && expedient.status !== 'draft' && (
+                            <StatusChangeConfirmDialog
+                              onConfirm={() => handleStatusChange(expedient.id, expedient.status as 'en_tramite' | 'archivado')}
+                              title={`${getStatusChangeLabel(expedient.status as 'en_tramite' | 'archivado')} expediente`}
+                              message={getStatusChangeMessage(expedient.status as 'en_tramite' | 'archivado')}
                             >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                              >
+                                <RefreshCw className="w-4 h-4" />
+                              </Button>
+                            </StatusChangeConfirmDialog>
                           )}
                         </div>
                       </td>

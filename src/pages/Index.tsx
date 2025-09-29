@@ -72,7 +72,7 @@ const mockExpedients: ExpedientSummary[] = [
     updatedAt: new Date('2024-01-28'),
     createdBy: 'Dr. Roberto Silva',
     department: 'Mesa de Entrada',
-    status: 'pausado',
+    status: 'archivado',
     tipoTramite: 'Recurso Inconstitucionalidad',
     solicitante: 'Defensor General',
     confidencial: false,
@@ -89,7 +89,7 @@ const mockExpedients: ExpedientSummary[] = [
     updatedAt: new Date('2024-01-25'),
     createdBy: 'Dra. Laura Pérez',
     department: 'Defensoría Civil',
-    status: 'pausado',
+    status: 'en_tramite',
     tipoTramite: 'Asesoramiento Civil',
     solicitante: 'Pérez, María Elena',
     confidencial: true,
@@ -205,6 +205,28 @@ function AppContent() {
     }
   };
 
+  const handleStatusChange = (id: string, newStatus: 'en_tramite' | 'archivado') => {
+    setExpedients(prev => prev.map(exp => 
+      exp.id === id 
+        ? { 
+            ...exp, 
+            status: newStatus,
+            updatedAt: new Date() 
+          }
+        : exp
+    ));
+    
+    const statusLabels = {
+      en_tramite: 'En Trámite',
+      archivado: 'Archivado'
+    };
+    
+    toast({
+      title: "Estado actualizado",
+      description: `El expediente ahora está ${statusLabels[newStatus]}`,
+    });
+  };
+
   const handleSaveActuacion = (data: any) => {
     return new Promise((resolve, reject) => {
       console.log('[Index.handleSaveActuacion] Iniciando guardado de actuación:', data);
@@ -264,7 +286,7 @@ function AppContent() {
   const handleBackFromEditor = () => {
     setCurrentExpedientId(null);
     setAutoCreateActuacion(false);
-    setCurrentView('dashboard');
+    setCurrentView('expedientes');
   };
 
   // Dashboard button handlers
@@ -310,8 +332,8 @@ function AppContent() {
           <ExpedientList
             expedients={expedients}
             onViewExpedient={handleViewExpedient}
-            onEditExpedient={handleEditExpedient}
             onCreateExpedient={handleCreateExpedient}
+            onStatusChange={handleStatusChange}
             initialStatusFilter={statusFilter}
           />
         );
